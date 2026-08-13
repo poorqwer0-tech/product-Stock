@@ -1,0 +1,40 @@
+🚀 1. คำสั่งใช้ประจำ (เวลาแก้ไขโค้ดเสร็จแล้วจะอัปเดตขึ้น GitHub)
+(อย่าลืมกด Ctrl + S บันทึกไฟล์ใน VS Code ก่อนรันคำสั่ง)
+
+Bash
+git add .
+git commit -m "update web"
+git push
+
+(ถ้าขึ้นเตือนเรื่อง branch ครั้งแรก ให้ใช้ git push -u origin master แทนคำสั่ง git push แค่ครั้งเดียวครับ)
+
+🛠️ 2. คำสั่งเช็กสถานะโปรเจกต์
+เช็กว่ามีไฟล์ไหนถูกแก้ไขบ้าง (ตัวหนังสือสีแดง):
+
+git status
+
+เช็กว่า Git เชื่อมอยู่กับ Repository URL ไหน:
+
+git remote -v
+🔄 3. คำสั่งเปลี่ยน Repository ไปใช้ลิงก์ใหม่
+(เช่น ตอนที่เราเปลี่ยนไปใช้ https://github.com/poorqwer0-tech/html)
+
+git remote set-url origin https://github.com/poorqwer0-tech/html.git
+🧹 4. คำสั่งแก้ปัญหาไฟล์ใหญ่ติด node_modules หรือล้าง History เก่า
+(ใช้เฉพาะตอนที่ Push ไม่ผ่านเพราะติดไฟล์ขยะ/ไฟล์ใหญ่เกิน 100 MB)
+
+# 1. ลบไฟล์จากการติดตามของ Git
+git rm -r --cached .
+
+# 2. บันทึกละเว้น node_modules
+echo node_modules/ >> .gitignore
+
+# 3. ล้าง History เก่าและทำ Commit ใหม่แบบสะอาด
+git checkout --orphan temp_branch
+git add .
+git commit -m "Initial clean commit"
+git branch -D master
+git branch -m master
+
+# 4. บังคับ Push ขึ้น GitHub
+git push -u origin master --force
