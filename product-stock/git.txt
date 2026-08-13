@@ -1,7 +1,6 @@
 🚀 1. คำสั่งใช้ประจำ (เวลาแก้ไขโค้ดเสร็จแล้วจะอัปเดตขึ้น GitHub)
 (อย่าลืมกด Ctrl + S บันทึกไฟล์ใน VS Code ก่อนรันคำสั่ง)
 
-Bash
 git add .
 git commit -m "update web"
 git push
