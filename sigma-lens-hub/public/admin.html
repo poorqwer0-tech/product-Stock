@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sigma Lens Admin | Control Panel</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <!-- Background Grid -->
+  <div class="background-grid"></div>
+  <!-- Floating Particles -->
+  <div class="particles-container">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <!-- Login Screen (Hidden by default) -->
+  <div id="login-screen" class="login-screen hidden">
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-icon">◆</div>
+          <h1>SIGMA LENS</h1>
+          <p>ADMIN AUTHENTICATION</p>
+        </div>
+
+        <form id="login-form" class="login-form">
+          <div class="form-group">
+            <label for="username">USERNAME:</label>
+            <input type="text" id="username" name="username" placeholder="Enter admin username" required>
+          </div>
+          <div class="form-group">
+            <label for="password">PASSWORD:</label>
+            <input type="password" id="password" name="password" placeholder="Enter password" required>
+          </div>
+          <button type="submit" class="login-btn">[ LOGIN ]</button>
+        </form>
+
+        <div class="login-footer">
+          <p>Default: admin / admin123</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Admin Dashboard (Hidden by default) -->
+  <div id="admin-dashboard" class="admin-dashboard hidden">
+    <!-- Header -->
+    <header class="admin-header">
+      <div class="header-content">
+        <div class="logo-section">
+          <div class="logo-icon">◆</div>
+          <h1 class="logo-text">ADMIN CONTROL PANEL</h1>
+          <span class="status-indicator pulse">● AUTHORIZED</span>
+        </div>
+        <div class="user-info">
+          <span id="current-user">admin</span>
+          <button id="logout-btn" class="logout-btn">[ LOGOUT ]</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="admin-nav">
+      <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
+      <button class="nav-tab" data-tab="links">Links Manager</button>
+      <button class="nav-tab" data-tab="profile">Profile Settings</button>
+      <button class="nav-tab" data-tab="logs">System Logs</button>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="admin-content">
+      <!-- Dashboard Tab -->
+      <div id="dashboard-tab" class="tab-content active">
+        <div class="dashboard-grid">
+          <div class="stat-widget">
+            <div class="stat-icon">🔗</div>
+            <div class="stat-details">
+              <div class="stat-value" id="dash-total-links">0</div>
+              <div class="stat-label">Total Links</div>
+            </div>
+          </div>
+
+          <div class="stat-widget">
+            <div class="stat-icon">👆</div>
+            <div class="stat-details">
+              <div class="stat-value" id="dash-total-clicks">0</div>
+              <div class="stat-label">Total Clicks</div>
+            </div>
+          </div>
+
+          <div class="stat-widget">
+            <div class="stat-icon">👤</div>
+            <div class="stat-details">
+              <div class="stat-value" id="dash-total-users">0</div>
+              <div class="stat-label">Active Users</div>
+            </div>
+          </div>
+
+          <div class="stat-widget">
+            <div class="stat-icon">📈</div>
+            <div class="stat-details">
+              <div class="stat-value" id="dash-avg-ctr">0%</div>
+              <div class="stat-label">Avg CTR</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-section">
+          <h2 class="section-title">System Status</h2>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label">Database:</span>
+              <span class="status-badge online">✓ CONNECTED</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">API Server:</span>
+              <span class="status-badge online">✓ RUNNING</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">File Storage:</span>
+              <span class="status-badge online">✓ ACTIVE</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Authentication:</span>
+              <span class="status-badge online">✓ SECURED</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Links Manager Tab -->
+      <div id="links-tab" class="tab-content">
+        <div class="links-manager">
+          <!-- Add New Link Form -->
+          <div class="form-section">
+            <h2 class="section-title">Create New Link</h2>
+            <form id="add-link-form" class="link-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Title:</label>
+                  <input type="text" id="form-title" required placeholder="Link title">
+                </div>
+                <div class="form-group">
+                  <label>URL:</label>
+                  <input type="url" id="form-url" required placeholder="https://example.com">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Category:</label>
+                  <input type="text" id="form-category" placeholder="e.g., social, work, dev">
+                </div>
+                <div class="form-group">
+                  <label>Icon Emoji:</label>
+                  <input type="text" id="form-icon" value="🔗" maxlength="2">
+                </div>
+              </div>
+
+              <div class="form-group full-width">
+                <label>Description:</label>
+                <textarea id="form-description" rows="3" placeholder="Optional description"></textarea>
+              </div>
+
+              <button type="submit" class="submit-btn">[ + ADD LINK ]</button>
+            </form>
+          </div>
+
+          <!-- Links List -->
+          <div class="list-section">
+            <h2 class="section-title">All Links</h2>
+            <div class="table-container">
+              <table class="links-table">
+                <thead>
+                  <tr>
+                    <th>Icon</th>
+                    <th>Title</th>
+                    <th>URL</th>
+                    <th>Category</th>
+                    <th>Clicks</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="links-list">
+                  <tr class="loading-row">
+                    <td colspan="7">Loading links...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Settings Tab -->
+      <div id="profile-tab" class="tab-content">
+        <div class="profile-settings">
+          <h2 class="section-title">Hub Profile Settings</h2>
+          
+          <form id="profile-form" class="profile-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Hub Name:</label>
+                <input type="text" id="profile-name" required placeholder="Your hub name">
+              </div>
+              <div class="form-group">
+                <label>Theme:</label>
+                <select id="profile-theme">
+                  <option value="cyberpunk">Cyberpunk</option>
+                  <option value="neon">Neon</option>
+                  <option value="matrix">Matrix</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group full-width">
+              <label>Bio:</label>
+              <textarea id="profile-bio" rows="4" placeholder="Hub description/bio"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="upload-group">
+                <label>Avatar Image:</label>
+                <div class="upload-preview">
+                  <img id="avatar-preview" src="https://via.placeholder.com/100?text=AVATAR" alt="Avatar">
+                </div>
+                <input type="file" id="avatar-upload" accept="image/*">
+                <small>Max 5MB</small>
+              </div>
+
+              <div class="upload-group">
+                <label>Banner Image:</label>
+                <div class="upload-preview">
+                  <img id="banner-preview" src="https://via.placeholder.com/200x100?text=BANNER" alt="Banner">
+                </div>
+                <input type="file" id="banner-upload" accept="image/*">
+                <small>Max 5MB</small>
+              </div>
+            </div>
+
+            <button type="submit" class="submit-btn">[ SAVE PROFILE ]</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Logs Tab -->
+      <div id="logs-tab" class="tab-content">
+        <div class="logs-section">
+          <h2 class="section-title">System Logs</h2>
+          <div class="logs-container" id="logs-list">
+            <div class="log-entry">
+              <span class="log-time">Loading...</span>
+              <span class="log-action">system</span>
+              <span class="log-message">Fetching system logs</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Edit Link -->
+    <div id="edit-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>EDIT LINK</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <form id="edit-link-form" class="link-form">
+          <input type="hidden" id="edit-link-id">
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Title:</label>
+              <input type="text" id="edit-title" required>
+            </div>
+            <div class="form-group">
+              <label>URL:</label>
+              <input type="url" id="edit-url" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Category:</label>
+              <input type="text" id="edit-category">
+            </div>
+            <div class="form-group">
+              <label>Icon:</label>
+              <input type="text" id="edit-icon" maxlength="2">
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Description:</label>
+            <textarea id="edit-description" rows="3"></textarea>
+          </div>
+
+          <div class="modal-buttons">
+            <button type="submit" class="submit-btn">[ UPDATE ]</button>
+            <button type="button" class="cancel-btn" onclick="closeEditModal()">[ CANCEL ]</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

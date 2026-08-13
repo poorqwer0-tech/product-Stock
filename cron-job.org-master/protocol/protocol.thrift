@@ -1,0 +1,317 @@
+enum JobStatus
+{
+    UNKNOWN			    = 0,
+    OK				    = 1,
+    FAILED_DNS		    = 2,
+    FAILED_CONNECT	    = 3,
+    FAILED_HTTPERROR	= 4,
+    FAILED_TIMEOUT	    = 5,
+    FAILED_SIZE		    = 6,
+    FAILED_URL		    = 7,
+    FAILED_INTERNAL	    = 8,
+    FAILED_OTHERS 	    = 9
+}
+
+enum RequestMethod
+{
+    GET                 = 0,
+    POST                = 1,
+    OPTIONS             = 2,
+    HEAD                = 3,
+    PUT                 = 4,
+    DELETE              = 5,
+    TRACE               = 6,
+    CONNECT             = 7,
+    PATCH               = 8
+}
+
+enum JobType
+{
+    DEFAULT             = 0,
+    MONITORING          = 1
+}
+
+struct JobIdentifier
+{
+    1: i64 jobId;
+    2: i64 userId;
+}
+
+struct JobMetadata
+{
+    1: bool enabled;
+    2: string title;
+    3: bool saveResponses;
+    4: JobType type;
+    5: optional i64 userGroupId;
+    6: optional i32 requestTimeout;
+    7: optional bool redirectSuccess;
+    8: optional i32 folderId;
+}
+
+struct JobExecutionInfo
+{
+    1: JobStatus lastStatus;
+    2: i64 lastFetch;
+    3: i32 lastDuration;
+    4: i32 failCounter;
+    5: i32 unfilteredFailCounter;
+    6: optional i64 sslCertExpiry; // in s, 0 = not available (plain HTTP or no TLS)
+}
+
+struct JobData
+{
+    1: string url;
+    2: RequestMethod requestMethod;
+}
+
+struct JobExtendedData
+{
+    1: string body;
+    2: map<string, string> headers;
+}
+
+struct JobSchedule
+{
+    1: set<i8> hours;
+    2: set<i8> mdays;
+    3: set<i8> minutes;
+    4: set<i8> months;
+    5: set<i8> wdays;
+    6: string timezone;
+    7: optional i64 expiresAt;
+}
+
+struct JobAuthentication
+{
+    1: bool enable;
+    2: string user;
+    3: string password;
+}
+
+struct JobNotification
+{
+    1: bool onFailure;
+    2: bool onSuccess;
+    3: bool onDisable;
+    4: i32 onFailureCount;
+    5: bool onSslCertExpiry;
+    6: i32 onSslCertExpirySeconds; // in s before certificate expiry
+}
+
+struct Job
+{
+    1: required JobIdentifier identifier;
+    2: optional JobMetadata metaData;
+    3: optional JobExecutionInfo executionInfo;
+    4: optional JobAuthentication authentication;
+    5: optional JobNotification notification;
+    6: optional JobSchedule schedule;
+    7: optional JobData data;
+    8: optional JobExtendedData extendedData;
+}
+
+struct NodeStatsEntry
+{
+    1: i8 d;
+    2: i8 m;
+    3: i16 y;
+    4: i8 h;
+    5: i8 i;
+    6: i64 jobs;
+    7: double jitter;
+}
+
+struct JobLogStatsEntry
+{
+    1: i32 nameLookup;
+    2: i32 connect;
+    3: i32 appConnect;
+    4: i32 preTransfer;
+    5: i32 startTransfer;
+    6: i32 total;
+}
+
+struct JobLogEntry
+{
+    1: i64 jobLogId;
+    2: JobIdentifier jobIdentifier;
+    3: i64 date;
+    4: i64 datePlanned;
+    5: i32 jitter;
+    6: string url;
+    7: i32 duration;
+    8: JobStatus status;
+    9: string statusText;
+    10: i16 httpStatus;
+    11: i16 mday;
+    12: i16 month;
+    13: optional string headers;
+    14: optional string body;
+    15: optional JobLogStatsEntry stats;
+    16: optional i64 sslCertExpiry; // in s, 0 = not available (plain HTTP or no TLS)
+}
+
+struct UserDetails
+{
+    1: i64 userId;
+    2: string email;
+    3: string firstName;
+    4: string lastName;
+    5: string language;
+    6: optional bool suppressNotifications;
+}
+
+struct UserGroup
+{
+    1: i64 userGroupId;
+    2: string title;
+    3: i32 requestTimeout;
+    4: i32 requestMaxSize;
+    5: i32 maxFailures;
+    6: i8 executionPriority;
+}
+
+struct Phrases
+{
+    1: map<string, map<string, string>> phrases;
+}
+
+enum NotificationType
+{
+    FAILURE             = 0,
+    SUCCESS             = 1,
+    DISABLE             = 2,
+    SSL_CERT_EXPIRY     = 3
+}
+
+struct NotificationEntry
+{
+    1: i64 notificationId;
+    2: i64 jobLogId;
+    3: JobIdentifier jobIdentifier;
+    4: i64 date;
+    5: NotificationType type;
+    6: i64 dateStarted;
+    7: i64 datePlanned;
+    8: string url;
+    9: JobStatus executionStatus;
+    10: string executionStatusText;
+    11: i16 httpStatus;
+}
+
+struct TimeSeriesDataEntry
+{
+    1: i64 date;
+    2: i32 duration;
+    3: i32 uptimeCounter;
+    4: i32 uptimeDenominator;
+}
+
+struct TimeSeriesData
+{
+    1: list<TimeSeriesDataEntry> last24Hours;
+    2: list<TimeSeriesDataEntry> last12Months;
+}
+
+typedef string TestRunHandle
+
+enum TestRunState
+{
+    PREPARING           = 0,
+    CONNECTING          = 1,
+    SENDING_HEADERS     = 2,
+    SENDING_DATA        = 3,
+    RECEIVING_HEADERS   = 4,
+    RECEIVING_DATA      = 5,
+    DONE                = 6
+}
+
+struct TestRunStatus
+{
+    1: TestRunState state;
+    2: JobStatus result;
+
+    3: string headers;
+    4: string body;
+
+    5: string headersOut;
+    6: string headersIn;
+    7: string dataOut;
+    8: string dataIn;
+
+    9: i32 duration;
+    10: string statusText;
+    11: i16 httpStatus;
+    12: string peerAddress;
+    13: i16 peerPort;
+    14: JobLogStatsEntry stats;
+    15: i64 sslCertExpiry; // in s, 0 = not available (plain HTTP or no TLS)
+}
+
+struct WAFValidatorResult
+{
+    1: bool blocked;
+    2: i16 status;
+    3: string log;
+    4: string additionalLogs;
+}
+
+struct UserInfo
+{
+    1: i64 userId;
+    2: double scheduleLoad;
+}
+
+exception ResourceNotFound          {}
+exception Forbidden                 {}
+exception InvalidArguments          {}
+exception InternalError             {}
+exception FeatureNotAvailable       {}
+
+service ChronosNode
+{
+    bool ping();
+
+    list<Job> getJobsForUser(1: i64 userId) throws(1: InternalError ie);
+    Job getJobDetails(1: JobIdentifier identifier) throws(1: ResourceNotFound rnf, 2: InternalError ie);
+
+    list<JobLogEntry> getJobLog(1: JobIdentifier identifier, 2: i16 maxEntries) throws(1: InternalError ie, 2: InvalidArguments ia);
+    JobLogEntry getJobLogDetails(1: i64 userId, 2: i16 mday, 3: i16 month, 4: i64 jobLogId) throws(1: ResourceNotFound rnf, 2: Forbidden ad, 3: InternalError ie, 4: InvalidArguments ia);
+
+    void createOrUpdateJob(1: Job job) throws(1: ResourceNotFound rnf, 2: Forbidden ad, 3: InternalError ie, 4: InvalidArguments ia);
+
+    list<NotificationEntry> getNotifications(1: i64 userId, 2: i16 maxEntries) throws(1: InternalError ie, 2: InvalidArguments ia);
+
+    TimeSeriesData getTimeSeriesData(1: JobIdentifier identifier, 2: double p) throws(1: ResourceNotFound rnf, 2: InternalError ie);
+
+    void deleteJob(1: JobIdentifier identifier) throws(1: ResourceNotFound rnf, 2: InternalError ie);
+
+    void disableJobsForUser(1: i64 userId) throws(1: InternalError ie);
+    void moveJobsFromUserFolder(1: i64 userId, 2: i64 sourceFolderId, 3: i64 destFolderId) throws(1: InternalError ie);
+    void updateUserGroupId(1: i64 userId, 2: i64 userGroupId) throws(1: InternalError ie);
+    double getUserScheduleLoad(1: i64 userId) throws(1: InternalError ie);
+    list<UserInfo> getUserInfoForAllUsers() throws(1: InternalError ie);
+
+    TestRunHandle submitJobTestRun(1: Job job, 2: string xForwardedFor) throws(1: InternalError ie, 2: InvalidArguments ia, 3: FeatureNotAvailable na);
+    TestRunStatus getJobTestRunStatus(1: TestRunHandle handle) throws(1: InvalidArguments ia, 2: FeatureNotAvailable na);
+    void deleteJobTestRun(1: TestRunHandle handle) throws(1: FeatureNotAvailable na);
+}
+
+service ChronosMaster
+{
+    bool ping();
+
+    void reportNodeStats(1: i32 nodeId, 2: NodeStatsEntry stats);
+    UserDetails getUserDetails(1: i64 userId) throws(1: ResourceNotFound rnf, 2: InternalError ie);
+    Phrases getPhrases() throws(1: InternalError ie);
+
+    list<UserGroup> getUserGroups();
+}
+
+service WAFValidator
+{
+    bool ping();
+
+    WAFValidatorResult checkJob(1: Job job);
+}

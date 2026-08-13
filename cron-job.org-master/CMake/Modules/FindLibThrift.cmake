@@ -1,0 +1,7 @@
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(LIBTHRIFT REQUIRED thrift)
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LibThrift DEFAULT_MSG LIBTHRIFT_LIBRARIES LIBTHRIFT_INCLUDEDIR LIBTHRIFT_LIBDIR)
+mark_as_advanced(LIBTHRIFT_INCLUDEDIR LIBTHRIFT_LIBRARIES LIBTHRIFT_LIBDIR)

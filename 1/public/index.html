@@ -1,0 +1,139 @@
+link href="/admin.html" class="admin-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        CONTROL PANEL
+      </a>
+    </div>
+  </header>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sigma Lens Hub | Cyberpunk Control Panel</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+  <canvas id="particleCanvas"></canvas>
+
+  <header class="main-header">
+    <div class="header-brand">
+      <div class="logo-pulse"></div>
+      <h1 class="brand-title">SIGMA<span class="brand-accent">LENS</span></h1>
+      <span class="brand-sub">HUB v2.0.88</span>
+    </div>
+    <div class="header-status">
+      <div class="status-indicator online">
+        <span class="status-dot"></span>
+        <span class="status-text" id="systemStatus">SYSTEM ONLINE</span>
+      </div>
+      <a href="/admin.html" class="admin-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        CONTROL PANEL
+      </a>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <section class="profile-section">
+      <div class="profile-card glass">
+        <div class="profile-avatar-wrap">
+          <div class="avatar-ring"></div>
+          <img id="profileAvatar" src="" alt="Profile" class="profile-avatar">
+          <div class="avatar-status" id="profileStatusDot"></div>
+        </div>
+        <div class="profile-info">
+          <h2 class="profile-name" id="profileName">Loading...</h2>
+          <p class="profile-title" id="profileTitle">...</p>
+          <p class="profile-bio" id="profileBio">...</p>
+          <div class="profile-tags">
+            <span class="tag">ROOT ACCESS</span>
+            <span class="tag">SECURE</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="terminal-section">
+      <div class="terminal-window glass">
+        <div class="terminal-header">
+          <div class="terminal-buttons">
+            <span></span><span></span><span></span>
+          </div>
+          <span class="terminal-title">LIVE NETWORK FEED // TERMINAL_01</span>
+          <span class="terminal-time" id="terminalTime">00:00:00</span>
+        </div>
+        <div class="terminal-body" id="terminalBody">
+          <div class="terminal-line init">Initializing Sigma Lens Protocol...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="links-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="title-icon">◈</span>
+          NAVIGATION LINKS
+        </h2>
+        <div class="section-line"></div>
+      </div>
+      <div class="links-grid" id="linksGrid">
+        <div class="link-card skeleton">
+          <div class="skeleton-icon"></div>
+          <div class="skeleton-text"></div>
+        </div>
+        <div class="link-card skeleton">
+          <div class="skeleton-icon"></div>
+          <div class="skeleton-text"></div>
+        </div>
+        <div class="link-card skeleton">
+          <div class="skeleton-icon"></div>
+          <div class="skeleton-text"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="metrics-section">
+      <div class="metrics-grid">
+        <div class="metric-card glass">
+          <div class="metric-icon">◉</div>
+          <div class="metric-value" id="metricLinks">0</div>
+          <div class="metric-label">ACTIVE LINKS</div>
+        </div>
+        <div class="metric-card glass">
+          <div class="metric-icon">◈</div>
+          <div class="metric-value" id="metricUptime">00:00:00</div>
+          <div class="metric-label">SYSTEM UPTIME</div>
+        </div>
+        <div class="metric-card glass">
+          <div class="metric-icon">◎</div>
+          <div class="metric-value" id="metricCpu">0%</div>
+          <div class="metric-label">CPU LOAD</div>
+        </div>
+        <div class="metric-card glass">
+          <div class="metric-icon">◊</div>
+          <div class="metric-value" id="metricNet">0 MB/s</div>
+          <div class="metric-label">NET THROUGHPUT</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="main-footer">
+    <p>SIGMA LENS HUB // SECURE CONNECTION ESTABLISHED // ENCRYPTED</p>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

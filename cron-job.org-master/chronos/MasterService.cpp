@@ -1,0 +1,191 @@
+/*
+ * chronos, the cron-job.org execution daemon
+ * Copyright (C) 2017-2019 Patrick Schlangen <patrick@schlangen.me>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ */
+
+#include "MasterService.h"
+
+#include <iostream>
+
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TServerSocket.h>
+#include <thrift/transport/TBufferTransports.h>
+
+#include "ChronosMaster.h"
+#include "App.h"
+#include "Utils.h"
+#include "RpcMetricsProcessorEventHandler.h"
+#include "RpcThrow.h"
+
+using namespace ::apache::thrift;
+using namespace ::apache::thrift::protocol;
+using namespace ::apache::thrift::transport;
+using namespace ::apache::thrift::server;
+
+namespace {
+
+class ChronosMasterHandler : virtual public ChronosMasterIf
+{
+public:
+    ChronosMasterHandler()
+    {
+    }
+
+    bool ping() override
+    {
+        std::cout << "ChronosMasterHandler::ping()" << std::endl;
+        return true;
+    }
+
+    void reportNodeStats(const int32_t nodeId, const NodeStatsEntry &stats) override
+    {
+        using namespace Chronos;
+
+        std::cout << "ChronosMasterHandler::reportNodeStats(" << nodeId << ")" << std::endl;
+
+        try
+        {
+            std::unique_ptr<MySQL_DB> db(App::getInstance()->createMasterMySQLConnection());
+
+            db->query("INSERT INTO `nodestats`(`nodeid`,`d`,`m`,`y`,`h`,`i`,`jobs`,`jitter`) VALUES(%v,%d,%d,%d,%d,%d,%v,%f) "
+                "ON DUPLICATE KEY UPDATE `jobs`=`jobs`+%v,`jitter`=(`jobs`*`jitter`+%f)/(`jobs`+%v)",
+                nodeId,
+                stats.d, stats.m, stats.y, stats.h, stats.i,
+                stats.jobs, stats.jitter,
+                stats.jobs,
+                stats.jobs * stats.jitter,
+                stats.jobs);
+        }
+        catch(const std::exception &ex)
+        {
+            std::cout << "ChronosMasterHandler::reportNodeStats(): Exception: "  << ex.what() << std::endl;
+            Chronos::RpcThrow::internalError();
+        }
+    }
+
+    void getUserDetails(UserDetails &_return, const int64_t userId) override
+    {
+        using namespace Chronos;
+
+        std::cout << "ChronosMasterHandler::getUserDetails(" << userId << ")" << std::endl;
+
+        try
+        {
+            std::unique_ptr<MySQL_DB> db(App::getInstance()->createMasterMySQLConnection());
+
+	        MYSQL_ROW row;
+            auto res = db->query("SELECT `userid`,`email`,`firstname`,`lastname`,`lastlogin_lang`,`notifications_auto_disabled` "
+                    "FROM `user` WHERE `userid`=%v",
+                userId);
+            if(res->numRows() == 0)
+                Chronos::RpcThrow::resourceNotFound();
+            while((row = res->fetchRow()))
+            {
+                _return.userId      = std::stoll(row[0]);
+                _return.email       = row[1];
+                _return.firstName   = row[2];
+                _return.lastName    = row[3];
+                _return.language    = row[4];
+
+                _return.__isset.suppressNotifications   = true;
+                _return.suppressNotifications           = std::stoi(row[5]) == 1;
+            }
+        }
+        catch(const std::exception &ex)
+        {
+            std::cout << "ChronosMasterHandler::getUserDetails(): Exception: "  << ex.what() << std::endl;
+            Chronos::RpcThrow::internalError();
+        }
+    }
+
+    void getPhrases(Phrases &_return) override
+    {
+        using namespace Chronos;
+
+        std::cout << "ChronosMasterHandler::getPhrases()" << std::endl;
+
+        try
+        {
+            std::unique_ptr<MySQL_DB> db(App::getInstance()->createMasterMySQLConnection());
+
+	        MYSQL_ROW row;
+            auto res = db->query("SELECT `lang`,`key`,`value` FROM `phrases`");
+            while((row = res->fetchRow()))
+            {
+                _return.phrases[row[0]][row[1]] = row[2];
+            }
+        }
+        catch(const std::exception &ex)
+        {
+            std::cout << "ChronosMasterHandler::getPhrases(): Exception: "  << ex.what() << std::endl;
+            Chronos::RpcThrow::internalError();
+        }
+    }
+
+    void getUserGroups(std::vector<UserGroup> &_return) override
+    {
+        using namespace Chronos;
+
+        std::cout << "ChronosMasterHandler::getUserGroups()" << std::endl;
+
+        try
+        {
+            std::unique_ptr<MySQL_DB> db(App::getInstance()->createMasterMySQLConnection());
+
+            MYSQL_ROW row;
+            auto res = db->query("SELECT `usergroupid`,`title`,`request_timeout`,`request_max_size`,`max_failures`,`execution_priority` FROM `usergroup`");
+            while((row = res->fetchRow()))
+            {
+                UserGroup ug;
+                ug.userGroupId          = std::stoll(row[0]);
+                ug.title                = row[1];
+                ug.requestTimeout       = std::stol(row[2]);
+                ug.requestMaxSize       = std::stol(row[3]);
+                ug.maxFailures          = std::stol(row[4]);
+                ug.executionPriority    = std::stoi(row[5]);
+                _return.push_back(ug);
+            }
+        }
+        catch(const std::exception &ex)
+        {
+            std::cout << "ChronosMasterHandler::getUserGroups(): Exception: "  << ex.what() << std::endl;
+            Chronos::RpcThrow::internalError();
+        }
+    }
+};
+
+}
+
+namespace Chronos {
+
+MasterService::MasterService(const std::string &interface, int port)
+{
+    auto handler = std::make_shared<ChronosMasterHandler>();
+    auto processor = std::make_shared<ChronosMasterProcessor>(handler);
+    processor->setEventHandler(std::make_shared<RpcMetricsProcessorEventHandler>("master"));
+    server = std::make_shared<TThreadedServer>(
+        processor,
+        std::make_shared<TServerSocket>(interface, port),
+        std::make_shared<TBufferedTransportFactory>(),
+        std::make_shared<TBinaryProtocolFactory>()
+    );
+}
+
+void MasterService::run()
+{
+    server->serve();
+}
+
+void MasterService::stop()
+{
+    server->stop();
+}
+
+} // Chronos

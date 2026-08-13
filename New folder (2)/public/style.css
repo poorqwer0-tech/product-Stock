@@ -1,0 +1,187 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Kanit', sans-serif;
+}
+
+body {
+    background: #030312;
+    color: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-x: hidden;
+    position: relative;
+    padding: 20px 0;
+}
+
+#space-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.container {
+    position: relative;
+    z-index: 2;
+    width: 90%;
+    max-width: 440px;
+    padding: 32px 24px;
+    background: rgba(13, 16, 38, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 40px rgba(138, 43, 226, 0.25),
+                inset 0 0 20px rgba(0, 242, 254, 0.15);
+    text-align: center;
+}
+
+.profile-section {
+    margin-bottom: 24px;
+}
+
+.profile-img-glow {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    padding: 4px;
+    background: linear-gradient(135deg, #00f2fe, #9b51e0, #ff007f);
+    box-shadow: 0 0 25px rgba(0, 242, 254, 0.6);
+    /* ลบ animation หมุนสีออก */
+}
+
+.profile-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #0d1026;
+    background-color: #0d1026; /* เพิ่มพื้นหลังสีเข้มป้องกันโปร่งใส */
+}
+
+.profile-name {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(45deg, #ffffff, #00f2fe, #ff007f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+}
+
+.contact-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: #e0e6ed;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.line-icon {
+    color: #06c755;
+    font-size: 1.2rem;
+}
+
+.donate-card {
+    background: linear-gradient(135deg, rgba(255, 0, 128, 0.18), rgba(121, 40, 202, 0.25));
+    border: 1.5px solid rgba(255, 0, 128, 0.6);
+    border-radius: 20px;
+    padding: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 0 25px rgba(255, 0, 128, 0.3);
+    animation: pulseGlow 2.5s infinite alternate;
+}
+
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 15px rgba(255, 0, 128, 0.3); }
+    100% { box-shadow: 0 0 30px rgba(255, 0, 128, 0.7); }
+}
+
+.donate-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #ff3385;
+    margin-bottom: 12px;
+    text-shadow: 0 0 10px rgba(255, 51, 133, 0.5);
+}
+
+.links-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.btn-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 20px;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-link i {
+    font-size: 1.35rem;
+}
+
+.btn-link:hover {
+    transform: translateY(-4px) scale(1.02);
+}
+
+.btn-donate {
+    background: linear-gradient(45deg, #ff007f, #ff5e62);
+    border: none;
+    box-shadow: 0 6px 20px rgba(255, 0, 127, 0.4);
+}
+
+.btn-donate:hover {
+    box-shadow: 0 8px 25px rgba(255, 0, 127, 0.7);
+}
+
+.btn-line:hover {
+    background: #06c755;
+    border-color: #06c755;
+    box-shadow: 0 0 20px rgba(6, 199, 85, 0.6);
+}
+
+.btn-facebook:hover {
+    background: #1877f2;
+    border-color: #1877f2;
+    box-shadow: 0 0 20px rgba(24, 119, 242, 0.6);
+}
+
+.btn-instagram:hover {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    border-color: #dc2743;
+    box-shadow: 0 0 20px rgba(220, 39, 67, 0.6);
+}
+
+.btn-tiktok:hover {
+    background: #000000;
+    border-color: #00f2fe;
+    box-shadow: -4px 0 15px #ff0050, 4px 0 15px #00f2fe;
+}

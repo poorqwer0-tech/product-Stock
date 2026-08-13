@@ -1,0 +1,962 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useHistory } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+
+import {
+  LinearProgress, Paper, makeStyles, TextField, Switch, FormControl, FormLabel,
+  FormGroup, FormControlLabel, Select, MenuItem, InputLabel, TableContainer, Button,
+  IconButton, Tabs, Tab, Grid, CircularProgress, Dialog, DialogTitle, DialogContent,
+  DialogContentText, DialogActions, InputAdornment,
+  Box
+} from '@material-ui/core';
+import { grey } from '@material-ui/core/colors';
+import { Alert, AlertTitle } from '@material-ui/lab';
+import { useSnackbar } from 'notistack';
+
+import {
+  getJobDetails, updateJob, createJob,
+  deleteJob as apiDeleteJob,
+  cloneJob as apiCloneJob
+} from '../../utils/API';
+import {
+  RegexPatterns,
+  RequestMethod,
+  RequestMethodsSupportingCustomBody
+} from '../../utils/Constants';
+import { looksLikeHttpCommand, parseHttpCommand, looksLikeCrontabLine, parseCrontabLine } from '../../utils/CommandParser';
+import useTimezones from '../../hooks/useTimezones';
+import NotFound from '../misc/NotFound';
+import Breadcrumbs from '../misc/Breadcrumbs';
+import Table from '../misc/Table';
+import JobSchedule from './JobSchedule';
+import Heading from '../misc/Heading';
+import ActionMenu from '../misc/ActionMenu';
+
+import DeleteIcon from '@material-ui/icons/Delete';
+import AddIcon from '@material-ui/icons/Add';
+import AlarmIcon from '@material-ui/icons/Alarm';
+import TuneIcon from '@material-ui/icons/Tune';
+import SaveIcon from '@material-ui/icons/Save';
+import ExpandIcon from '@material-ui/icons/ExpandMore';
+import ActionsIcon from '@material-ui/icons/MoreVert';
+import HistoryIcon from '@material-ui/icons/History';
+import CloneIcon from '@material-ui/icons/FileCopy';
+import TestIcon from '@material-ui/icons/PlayCircleOutline';
+import TimerIcon from '@material-ui/icons/Timer';
+import ExportIcon from '@material-ui/icons/ImportExport';
+import StatusBadgeIcon from '@material-ui/icons/Label';
+import FolderIcon from '@material-ui/icons/FolderOutlined';
+import ApplyIcon from '@material-ui/icons/DoubleArrow';
+import CodeIcon from '@material-ui/icons/Code';
+import ValidatingTextField from '../misc/ValidatingTextField';
+import clsx from 'clsx';
+import useUserProfile from '../../hooks/useUserProfile';
+import JobTestRun from './JobTestRun';
+import JobExport from './JobExport';
+import CurlImportDialog from './CurlImportDialog';
+import useFolder from '../../hooks/useFolder';
+import VariableMenu from '../misc/VariableMenu';
+import JobStatusBadgeDialog from './JobStatusBadgeDialog';
+
+const useStyles = makeStyles((theme) => ({
+  paper: {
+    padding: theme.spacing(2),
+    marginBottom: theme.spacing(2)
+  },
+  tabPanel: {
+    padding: theme.spacing(0)
+  },
+  fieldSet: {
+    padding: theme.spacing(2),
+    margin: theme.spacing(2, 0),
+    '& .MuiTextField-root:not(:last-child)': {
+      marginBottom: theme.spacing(2)
+    },
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.spacing(0.5),
+    '& legend': {
+      padding: theme.spacing(0, 1)
+    }
+  },
+  authFieldSet: {
+    marginTop: - theme.spacing(0.3)
+  },
+  headersTable: {
+    '& .MuiTextField-root': {
+      margin: theme.spacing(0)
+    },
+  },
+  headerActionButton: {
+    textAlign: 'center'
+  },
+  requestBody: {
+    '& textarea': {
+      fontFamily: '"Roboto Mono", courier',
+      padding: 'inherit',
+      border: `1px solid ${grey[500]}`,
+    }
+  },
+  formControl: {
+    margin: theme.spacing(1)
+  },
+  tableContainer: {
+    marginBottom: theme.spacing(2)
+  }
+}));
+
+let nextHeaderId = 0;
+function newHeaderId() {
+  return `header-${++nextHeaderId}`;
+}
+
+export default function JobEditor({ match }) {
+  //! @todo Check URL for >/dev/null etc.
+  const { folderId, folderBreadcrumb, urlPrefix, folders } = useFolder(match);
+
+  const { t } = useTranslation();
+  const classes = useStyles();
+  const timezones = useTimezones();
+  const userProfile = useUserProfile();
+  const history = useHistory();
+  const { enqueueSnackbar } = useSnackbar();
+
+  const jobId = parseInt(match.params.jobId || -1);
+  const [ isLoading, setIsLoading ] = useState(true);
+  const [ job, setJob ] = useState(null);
+
+  const [ jobTitle, setJobTitle ] = useState('');
+  const [ jobURL, setJobURL ] = useState('');
+  const jobURLRef = useRef();
+  const [ urlFieldKey, setUrlFieldKey ] = useState(0);
+  const [ detectedCommand, setDetectedCommand ] = useState(null);
+  const requestTimeoutRef = useRef();
+  const requestBodyRef = useRef();
+  const authUserRef = useRef();
+  const authPasswordRef = useRef();
+  const [ jobEnabled, setJobEnabled ] = useState(false);
+  const [ saveResponses, setSaveResponses ] = useState(false);
+  const [ requestTimeout, setRequestTimeout ] = useState(-1);
+  const [ redirectSuccess, setRedirectSuccess ] = useState(false);
+  const [ authEnable, setAuthEnable ] = useState(false);
+  const [ authUser, setAuthUser ] = useState('');
+  const [ authPassword, setAuthPassword ] = useState('');
+  const [ notification, setNotification ] = useState({
+    onSuccess: false,
+    onFailure: false,
+    onFailureCount: 1,
+    onDisable: true,
+    onSslCertExpiry: false,
+    onSslCertExpirySeconds: 604800
+  });
+  const [ requestMethod, setRequestMethod ] = useState(RequestMethod.GET);
+  const [ requestBody, setRequestBody ] = useState('');
+  const [ jobHeaders, setJobHeaders ] = useState([]);
+  const [ schedule, setSchedule ] = useState({});
+  const [ scheduleOverride, setScheduleOverride ] = useState(null);
+  const [ scheduleKey, setScheduleKey ] = useState(0);
+  const [ timezone, setTimezone ] = useState();
+  const [ jobFolderId, setJobFolderId ] = useState();
+  const [ tabValue, setTabValue ] = useState('common');
+  const [ saving, setSaving ] = useState(false);
+  const [ showDeleteJob, setShowDeleteJob ] = useState(false);
+  const [ showTestRun, setShowTestRun ] = useState(false);
+  const [ showExportJob, setShowExportJob ] = useState(false);
+  const [ showCurlImport, setShowCurlImport ] = useState(false);
+  const [ showStatusBadgeDialog, setShowStatusBadgeDialog ] = useState(false);
+  const [ updatedJob, setUpdatedJob ] = useState({});
+  const [ bodyLooksLikeJson, setBodyLooksLikeJson ] = useState(false);
+  const [ showContentTypeNote, setShowContentTypeNote ] = useState(false);
+
+  const createMode = (jobId === -1);
+
+  useEffect(() => {
+    if (bodyLooksLikeJson && RequestMethodsSupportingCustomBody.includes(requestMethod)) {
+      if (!jobHeaders.map(x => x['key'].toLowerCase().trim()).includes('content-type')) {
+        setShowContentTypeNote(true);
+        return;
+      }
+    }
+    setShowContentTypeNote(false);
+  }, [bodyLooksLikeJson, jobHeaders, requestMethod]);
+
+  //! @todo Export, import
+  //! @todo Show warning on leave if not saved?
+
+  useEffect(() => {
+    if (createMode) {
+      if (!userProfile || !userProfile.userProfile || !userProfile.userProfile.timezone) {
+        return;
+      }
+      setJob({
+        url: 'http://',
+        enabled: true,
+        saveResponses: false,
+        requestTimeout: Math.min(30, userProfile.userGroup.requestTimeout),
+        redirectSuccess: false,
+        auth: {
+          enable: false,
+          user: '',
+          password: ''
+        },
+        schedule: {
+          timezone: userProfile.userProfile.timezone,
+          mdays: [-1 ],
+          wdays: [-1],
+          months: [-1],
+          hours: [-1],
+          minutes: [0, 15, 30, 45]
+        },
+        extendedData: {
+          body: '',
+          headers: {}
+        },
+        notification: {
+          onSuccess: false,
+          onDisable: true,
+          onFailure: false,
+          onFailureCount: 1,
+          onSslCertExpiry: false,
+          onSslCertExpirySeconds: 604800
+        },
+        requestMethod: RequestMethod.GET,
+        folderId
+      });
+    } else {
+      getJobDetails(jobId)
+        .then(result => setJob(result.jobDetails))
+        .catch(() => setIsLoading(false));
+    }
+  }, [jobId, createMode, userProfile, folderId]);
+
+  function analyzeBody(value) {
+    value = (''+value).trim();
+    if ((value.startsWith('[') && value.endsWith(']')) || (value.startsWith('{') && value.endsWith('}'))) {
+      setBodyLooksLikeJson(true);
+    } else {
+      setBodyLooksLikeJson(false);
+    }
+  }
+
+  useEffect(() => {
+    if (job && userProfile && userProfile.userGroup) {
+      setJobTitle(job.title);
+      setJobURL(job.url);
+      setJobEnabled(!!job.enabled);
+      setSaveResponses(!!job.saveResponses);
+      setRequestTimeout(job.requestTimeout > 0 ? Math.min(job.requestTimeout, userProfile.userGroup.requestTimeout) : userProfile.userGroup.requestTimeout);
+      setRedirectSuccess(job.redirectSuccess);
+      setAuthEnable(!!job.auth.enable);
+      setAuthUser(job.auth.user);
+      setAuthPassword(job.auth.password);
+      setNotification({
+        onSslCertExpiry: false,
+        onSslCertExpirySeconds: 604800,
+        ...job.notification
+      });
+      setRequestMethod(job.requestMethod);
+      setRequestBody(job.extendedData.body);
+      analyzeBody(job.extendedData.body);
+      setTimezone(job.schedule.timezone);
+      setJobHeaders(Object.keys(job.extendedData.headers).reduce((prev, cur) =>
+        [...prev, { key: cur, value: job.extendedData.headers[cur], uuid: newHeaderId() }], []));
+      setIsLoading(false);
+      setJobFolderId(job.folderId);
+
+      if (job.folderId !== folderId) {
+        if (job.folderId === 0) {
+          history.push('/jobs/' + job.jobId);
+        } else {
+          history.push('/jobs/folders/' + job.folderId + '/' + job.jobId)
+        }
+      }
+    }
+  }, [job, userProfile, folderId, history]);
+
+  useEffect(() => {
+    setUpdatedJob({
+      title: jobTitle,
+      url: jobURL,
+      enabled: jobEnabled,
+      saveResponses,
+      requestTimeout,
+      redirectSuccess,
+      auth: {
+        enable: authEnable,
+        user: authUser,
+        password: authPassword
+      },
+      notification,
+      requestMethod,
+      extendedData: {
+        body: requestBody,
+        headers: jobHeaders.reduce((prev, cur) => ({...prev, [cur.key]: cur.value}), {})
+      },
+      schedule: {
+        ...schedule,
+        timezone
+      },
+      folderId: jobFolderId
+    });
+  }, [jobTitle, jobURL, jobEnabled, saveResponses, requestTimeout, redirectSuccess, authEnable, authUser, authPassword, notification, requestMethod, requestBody, jobHeaders, schedule, timezone, jobFolderId]);
+
+  const maxRequestTimeout = (userProfile && userProfile.userGroup && userProfile.userGroup.requestTimeout) || 30;
+
+  function saveJob() {
+    if (!jobURL.match(RegexPatterns.url)) {
+      enqueueSnackbar(t('jobs.invalidUrl'), { variant: 'error' });
+      jobURLRef.current && jobURLRef.current.focus();
+      return;
+    }
+
+    if (updatedJob.requestTimeout > maxRequestTimeout) {
+      enqueueSnackbar(t('jobs.invalidTimeout', { maxRequestTimeout }), { variant: 'error' });
+      requestTimeoutRef.current && requestTimeoutRef.current.focus();
+      return;
+    }
+
+    setSaving(true);
+
+    if (createMode) {
+      createJob(updatedJob)
+        .then(() => {
+          enqueueSnackbar(t('jobs.created'), { variant: 'success' });
+          history.push(jobFolderId === 0 ? '/jobs' : '/jobs/folders/' + jobFolderId);
+        })
+        .catch(error => {
+          if (error.response && error.response.status === 422) {
+            enqueueSnackbar(t('common.requestDeniedForSecurityReasons'), { variant: 'error' });
+          } else {
+            enqueueSnackbar(t('jobs.failedToCreate'), { variant: 'error' });
+          }
+        })
+        .finally(() => setSaving(false));
+    } else {
+      updateJob(jobId, updatedJob)
+        .then(() => getJobDetails(jobId))
+        .then(result => {
+          setJob(result.jobDetails);
+          enqueueSnackbar(t('jobs.saved'), { variant: 'success' });
+        })
+        .catch(error => {
+          if (error.response && error.response.status === 422) {
+            enqueueSnackbar(t('common.requestDeniedForSecurityReasons'), { variant: 'error' });
+          } else {
+            enqueueSnackbar(t('jobs.failedToSave'), { variant: 'error' });
+          }
+        })
+        .finally(() => setSaving(false));
+    }
+  }
+
+  function deleteJob() {
+    apiDeleteJob(jobId)
+      .then(() => {
+        enqueueSnackbar(t('jobs.deleted'), { variant: 'success' });
+        history.push(urlPrefix);
+      })
+      .catch(() => enqueueSnackbar(t('jobs.failedToDelete'), { variant: 'error' }))
+      .finally(() => setShowDeleteJob(false));
+  }
+
+  function cloneJob() {
+    apiCloneJob(jobId, t('jobs.cloneSuffix'))
+      .then(result => {
+        enqueueSnackbar(t('jobs.cloned'), { variant: 'success' });
+        history.push(urlPrefix + '/' + result.jobId);
+      })
+      .catch(() => enqueueSnackbar(t('jobs.failedToClone'), { variant: 'error' }));
+  }
+
+  if (isLoading) {
+    return <LinearProgress />;
+  }
+
+  if (!job) {
+    return <NotFound />;
+  }
+
+  function deleteHeader(rowNo) {
+    setJobHeaders(headers => headers.filter((value, index) => index !== rowNo));
+  }
+
+  function addHeader() {
+    setJobHeaders(headers => [...headers, {key: '', value: '', uuid: newHeaderId()}]);
+  }
+
+  function updateHeaderKey(rowNo, key) {
+    key = key.trim();
+    if (key.endsWith(':')) {
+      key = key.substring(0, key.length - 1).trim();
+    }
+    setJobHeaders(headers => headers.map((x, index) => index === rowNo ? {...x, key: key} : x));
+  }
+
+  function updateHeaderValue(rowNo, value) {
+    setJobHeaders(headers => headers.map((x, index) => index === rowNo ? {...x, value: value.trim()} : x));
+  }
+
+  function updateUrl(url) {
+    setJobURL(url);
+    setTabValue('common');
+    if (jobURLRef.current) {
+      jobURLRef.current.value = url;
+    }
+    // The URL field manages its own value internally (see ValidatingTextField),
+    // so bump its key to remount it and pick up the new value when we set the
+    // URL programmatically (test-run redirect, cURL/wget import, ...).
+    setUrlFieldKey(key => key + 1);
+    setShowTestRun(false);
+  }
+
+  // Detect a curl/wget command pasted into the URL field and remember the parsed
+  // result so we can offer a one-click import (GitHub issue #103).
+  function detectCommandInUrl(value) {
+    if (looksLikeCrontabLine(value)) {
+      const parsed = parseCrontabLine(value);
+      if (parsed && parsed.command && parsed.command.url) {
+        setDetectedCommand({ ...parsed.command, _schedule: parsed.schedule });
+      } else {
+        setDetectedCommand(null);
+      }
+    } else if (looksLikeHttpCommand(value)) {
+      const parsed = parseHttpCommand(value);
+      setDetectedCommand(parsed && parsed.url ? parsed : null);
+    } else {
+      setDetectedCommand(null);
+    }
+  }
+
+  function importDetectedCommand() {
+    if (!detectedCommand) {
+      return;
+    }
+
+    let method = null;
+    if (detectedCommand.method !== null && detectedCommand.method !== undefined) {
+      if (Object.prototype.hasOwnProperty.call(RequestMethod, detectedCommand.method)) {
+        method = RequestMethod[detectedCommand.method];
+      } else {
+        enqueueSnackbar(t('jobs.curlImport.unsupportedMethod', { method: detectedCommand.method }), { variant: 'error' });
+        return;
+      }
+    }
+
+    applyImportedCommand({
+      url: detectedCommand.url,
+      method,
+      headers: detectedCommand.headers,
+      body: detectedCommand.body,
+      auth: detectedCommand.auth,
+      schedule: detectedCommand._schedule || null,
+    });
+    setDetectedCommand(null);
+  }
+
+  function urlMutator(url) {
+    if (typeof(url) == 'string' || url instanceof String) {
+      if (url.startsWith('http://http://') || url.startsWith('http://https://')) {
+        url = url.substring(7);
+      }
+    }
+    return url;
+  }
+
+  function applyImportedCommand({ url, method, headers, body, auth, schedule: importedSchedule }) {
+    if (url) updateUrl(url);
+    if (method !== null && method !== undefined) setRequestMethod(method);
+    setJobHeaders((headers || []).map(x => ({...x, uuid: newHeaderId()})));
+
+    const nextBody = body === null || body === undefined ? '' : body;
+    setRequestBody(nextBody);
+    analyzeBody(nextBody);
+    if (requestBodyRef.current) requestBodyRef.current.value = nextBody;
+
+    if (auth) {
+      setAuthEnable(true);
+      setAuthUser(auth.user || '');
+      setAuthPassword(auth.password || '');
+      if (authUserRef.current) authUserRef.current.value = auth.user || '';
+      if (authPasswordRef.current) authPasswordRef.current.value = auth.password || '';
+    }
+
+    if (importedSchedule) {
+      setScheduleOverride(importedSchedule);
+      setScheduleKey(k => k + 1);
+    }
+
+    setTabValue('common');
+    setShowCurlImport(false);
+
+    const parts = [];
+    if (url) parts.push(t('jobs.curlImport.appliedParts.url'));
+    if (method !== null && method !== undefined) parts.push(t('jobs.curlImport.appliedParts.method'));
+    if (headers && headers.length > 0) parts.push(t('jobs.curlImport.appliedParts.headers', { count: headers.length }));
+    if (body) parts.push(t('jobs.curlImport.appliedParts.body'));
+    if (auth) parts.push(t('jobs.curlImport.appliedParts.auth'));
+    if (importedSchedule) parts.push(t('jobs.curlImport.appliedParts.schedule'));
+    enqueueSnackbar(t('jobs.curlImport.applied', { parts: parts.join(', ') }), { variant: 'success' });
+  }
+
+  const HEADERS_COLUMNS = [
+    {
+      cell: (item, rowNo) => <TextField
+        variant='filled'
+        label={t('jobs.key')}
+        size='small'
+        defaultValue={item.key}
+        onBlur={({target}) => updateHeaderKey(rowNo, target.value)}
+        fullWidth />
+    },
+    {
+      cell: (item, rowNo) => <TextField
+        variant='filled'
+        label={t('jobs.value')}
+        size='small'
+        defaultValue={item.value}
+        onBlur={({target}) => updateHeaderValue(rowNo, target.value)}
+        InputProps={{ endAdornment: <InputAdornment position='end'>
+            <VariableMenu />
+          </InputAdornment>
+        }}
+        fullWidth />
+    },
+    {
+      cell: (item, rowNo) => <IconButton
+                                size='small'
+                                onClick={() => deleteHeader(rowNo)}
+                                title={t('common.delete')}
+                                aria-label={t('common.delete')}>
+                                <DeleteIcon />
+                              </IconButton>
+    }
+  ];
+
+  return <>
+    <Breadcrumbs items={[
+        {
+          href: '/jobs',
+          text: t('common.cronjobs')
+        },
+        ...folderBreadcrumb,
+        createMode ? {
+          href: urlPrefix + '/create',
+          text: t('jobs.createJob')
+        } : {
+          href: urlPrefix + '/' + jobId,
+          text: job.title || job.url
+        }
+      ]} />
+    <Heading
+      actionButtons={!createMode &&
+        <ActionMenu
+          variant='contained'
+          size='small'
+          items={[
+            {
+              icon: <HistoryIcon fontSize='small' />,
+              text: t('jobs.executionHistory'),
+              href: urlPrefix + '/' + jobId + '/history'
+            },
+            {
+              icon: <CloneIcon fontSize='small' />,
+              text: t('common.clone'),
+              onClick: () => cloneJob()
+            },
+            {
+              icon: <ExportIcon fontSize='small' />,
+              text: t('common.export'),
+              onClick: () => setShowExportJob(true)
+            },
+            {
+              icon: <StatusBadgeIcon fontSize='small' />,
+              text: t('jobs.statusBadge'),
+              onClick: () => setShowStatusBadgeDialog(true)
+            },
+            {
+              icon: <DeleteIcon fontSize='small' />,
+              text: t('common.delete'),
+              onClick: () => setShowDeleteJob(true)
+            }
+          ]}
+          onClickItem={item => item.href ? history.push(item.href) : item.onClick()}
+          startIcon={<ActionsIcon />}
+          endIcon={<ExpandIcon />}
+          text={t('common.actions')}
+          />}
+      >
+      {createMode ? t('jobs.createJob') : t('jobs.editJobHeading', { jobTitle: job.title || job.url })}
+    </Heading>
+    <Tabs
+      value={tabValue}
+      onChange={(e, val) => setTabValue(val)}
+      indicatorColor="primary"
+      textColor="primary">
+      <Tab label={t('jobs.common')} icon={<AlarmIcon />} value='common' />
+      <Tab label={t('jobs.advanced')} icon={<TuneIcon />} value='advanced' />
+    </Tabs>
+    <div hidden={tabValue!=='common'} className={classes.tabPanel}>
+      <Paper className={classes.paper}>
+        <fieldset className={classes.fieldSet}>
+          <TextField
+            label={t('jobs.title')}
+            defaultValue={jobTitle}
+            onBlur={({target}) => setJobTitle(target.value)}
+            InputLabelProps={{shrink: true}}
+            fullWidth
+            />
+          <ValidatingTextField
+            key={urlFieldKey}
+            label={t('jobs.url')}
+            mutator={urlMutator}
+            defaultValue={jobURL}
+            pattern={RegexPatterns.url}
+            patternErrorText={t('jobs.invalidUrl')}
+            onChange={({target}) => detectCommandInUrl(target.value)}
+            onBlur={({target}) => setJobURL(target.value.trim())}
+            inputRef={jobURLRef}
+            InputLabelProps={{shrink: true}}
+            InputProps={{ endAdornment: <InputAdornment position='end'>
+                <VariableMenu />
+              </InputAdornment>
+            }}
+            fullWidth
+            required
+            />
+          {detectedCommand && <Box mb={2}>
+            <Alert severity='info'>
+              <AlertTitle>{t(detectedCommand._schedule ? 'jobs.crontabImport.title' : 'jobs.commandImport.title')}</AlertTitle>
+              <div>
+                {t(detectedCommand._schedule ? 'jobs.crontabImport.text' : 'jobs.commandImport.text')}
+              </div>
+              <Box mt={1}>
+                <Button
+                  variant='contained'
+                  size='small'
+                  color='default'
+                  startIcon={<CodeIcon />}
+                  onClick={() => importDetectedCommand()}>
+                  {t('jobs.commandImport.import')}
+                </Button>
+              </Box>
+            </Alert>
+          </Box>}
+          {folders && folders.length > 0 && <div>
+            <InputLabel shrink id='folder-label'>
+              {t('jobs.folder')}
+            </InputLabel>
+            <Select
+              value={folders ? jobFolderId : ''}
+              onChange={({target}) => setJobFolderId(target.value)}
+              labelId='folder-label'
+              startAdornment={<InputAdornment position='start'><FolderIcon /></InputAdornment>}
+              fullWidth>
+                <MenuItem value={0}>-</MenuItem>
+              {folders.map(folder =>
+                <MenuItem value={folder.folderId} key={folder.folderId}>{folder.title}</MenuItem>)}
+            </Select>
+          </div>}
+          <FormControlLabel
+            control={<Switch
+              checked={jobEnabled}
+              onChange={({target}) => setJobEnabled(target.checked)}
+              />}
+            label={t('jobs.enableJob')}
+            />
+          <FormControlLabel
+            control={<Switch
+              checked={saveResponses}
+              onChange={({target}) => setSaveResponses(target.checked)}
+              />}
+            label={t('jobs.saveResponses')}
+            />
+        </fieldset>
+
+        <fieldset className={classes.fieldSet}>
+          <FormLabel component='legend'>{t('jobs.executionSchedule')}</FormLabel>
+          <JobSchedule key={scheduleKey} initialSchedule={scheduleOverride || job.schedule || {}} timezone={timezone} onChange={sched => setSchedule(sched)} />
+        </fieldset>
+
+        <fieldset className={classes.fieldSet}>
+          <FormLabel component='legend'>{t('jobs.notifymewhen')}</FormLabel>
+          <FormGroup>
+            <FormControlLabel
+              control={<Switch
+                checked={notification.onFailure}
+                onChange={({target}) => setNotification(x => ({...x, onFailure: target.checked}))}
+                />}
+              label={t('jobs.notifyOn.onFailure')}
+              />
+            <Box ml={'3rem'} mb={1}>
+              <ValidatingTextField
+                label={t('jobs.notifyOnFailureRequiredTimes')}
+                defaultValue={notification.onFailureCount}
+                onChange={({target}) => setNotification(x => ({...x, onFailureCount: Math.max(1, parseInt(target.value))}))}
+                validator={val => parseInt(val) >= 1}
+                InputLabelProps={{shrink: true}}
+                inputProps={{min: 1, type: 'number'}}
+                InputProps={{
+                  endAdornment: <InputAdornment position='end'>{t('jobs.notifyOnFailureFailures', { count: notification.onFailureCount })}</InputAdornment>
+                }}
+                size='small'
+                />
+            </Box>
+            <FormControlLabel
+              control={<Switch
+                checked={notification.onSuccess}
+                onChange={({target}) => setNotification(x => ({...x, onSuccess: target.checked}))}
+                />}
+              label={t('jobs.notifyOn.onSuccess')}
+              />
+            <FormControlLabel
+              control={<Switch
+                checked={notification.onDisable}
+                onChange={({target}) => setNotification(x => ({...x, onDisable: target.checked}))}
+                />}
+              label={t('jobs.notifyOn.onDisable')}
+              />
+            <FormControlLabel
+              control={<Switch
+                checked={notification.onSslCertExpiry}
+                onChange={({target}) => setNotification(x => ({...x, onSslCertExpiry: target.checked}))}
+                />}
+              label={t('jobs.notifyOn.onSslCertExpiry')}
+              />
+            <Box ml={'3rem'} mb={1}>
+              <ValidatingTextField
+                key={`ssl-cert-expiry-days-${jobId}`}
+                label={t('jobs.notifyOnSslCertExpiryLeadTime')}
+                defaultValue={Math.round(notification.onSslCertExpirySeconds / 86400)}
+                onChange={({target}) => setNotification(x => ({
+                  ...x,
+                  onSslCertExpirySeconds: Math.max(0, parseInt(target.value, 10) || 0) * 86400
+                }))}
+                validator={val => parseInt(val, 10) >= 0}
+                InputLabelProps={{shrink: true}}
+                inputProps={{min: 0, type: 'number'}}
+                InputProps={{
+                  endAdornment: <InputAdornment position='end'>{t('jobs.notifyOnSslCertExpiryDays', { count: Math.round(notification.onSslCertExpirySeconds / 86400) })}</InputAdornment>
+                }}
+                size='small'
+                />
+            </Box>
+          </FormGroup>
+        </fieldset>
+      </Paper>
+    </div>
+
+    <div hidden={tabValue!=='advanced'} className={classes.tabPanel}>
+      <Paper className={classes.paper}>
+        <fieldset className={clsx(classes.fieldSet, classes.authFieldSet)}>
+          <FormLabel component='legend'>
+            <FormControlLabel
+              control={<Switch
+                checked={authEnable}
+                onChange={({target}) => setAuthEnable(target.checked)}
+                />}
+              label={t('jobs.requireshttpauth')}
+              />
+          </FormLabel>
+
+          <TextField
+            label={t('jobs.username')}
+            defaultValue={authUser}
+            disabled={!authEnable}
+            onBlur={({target}) => setAuthUser(target.value)}
+            inputRef={authUserRef}
+            InputLabelProps={{shrink: true}}
+            fullWidth
+            />
+          <TextField
+            label={t('jobs.password')}
+            defaultValue={authPassword}
+            type='password'
+            disabled={!authEnable}
+            onBlur={({target}) => setAuthPassword(target.value)}
+            inputRef={authPasswordRef}
+            InputLabelProps={{shrink: true}}
+            fullWidth
+            />
+        </fieldset>
+
+        <fieldset className={classes.fieldSet}>
+          <FormLabel component='legend'>{t('jobs.headers')}</FormLabel>
+
+          <TableContainer className={classes.tableContainer}>
+            <Table
+              size='small'
+              className={classes.headersTable}
+              columns={HEADERS_COLUMNS}
+              items={jobHeaders}
+              empty={<em>{t('jobs.noheaders')}</em>}
+              rowIdentifier='uuid'
+              noHeader
+              />
+          </TableContainer>
+
+          <Grid container direction='row' justifyContent='flex-end'>
+            <Grid item>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => addHeader()}
+                >{t('common.add')}</Button>
+            </Grid>
+          </Grid>
+        </fieldset>
+
+        <fieldset className={classes.fieldSet}>
+          <FormLabel component='legend'>{t('jobs.advanced')}</FormLabel>
+          <FormGroup>
+            <FormControl className={classes.formControl}>
+              <InputLabel shrink id='timezone-label'>
+                {t('jobs.timezone')}
+              </InputLabel>
+              <Select
+                value={timezones.length ? timezone : ''}
+                onChange={({target}) => setTimezone(target.value)}
+                labelId='timezone-label'>
+                {timezones.map(zone =>
+                  <MenuItem value={zone} key={zone}>{zone}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl className={classes.formControl}>
+              <InputLabel shrink id='request-method-label'>
+                {t('jobs.requestMethod')}
+              </InputLabel>
+              <Select
+                value={requestMethod}
+                onChange={({target}) => setRequestMethod(target.value)}
+                labelId='request-method-label'>
+                {Object.keys(RequestMethod).map(method =>
+                  <MenuItem value={RequestMethod[method]} key={method}>{method}</MenuItem>)}
+              </Select>
+            </FormControl>
+            {showContentTypeNote && <Box>
+              <Alert severity='info'>
+                <AlertTitle>{t('jobs.jsonNote.title')}</AlertTitle>
+                <div>
+                  {t('jobs.jsonNote.text')}
+                </div>
+                <Box mt={1}>
+                  <Button
+                    variant='contained'
+                    size='small'
+                    color='default'
+                    startIcon={<ApplyIcon />}
+                    onClick={() => setJobHeaders(x => [...x, {key: 'Content-Type', value: 'application/json', uuid: newHeaderId()}])}>
+                    {t('jobs.jsonNote.setContentType')}
+                  </Button>
+                </Box>
+              </Alert>
+            </Box>}
+            <FormControl className={classes.formControl}>
+              <TextField
+                label={t('jobs.requestBody')}
+                className={classes.requestBody}
+                defaultValue={requestBody}
+                onBlur={({target}) => setRequestBody(target.value)}
+                onChange={({target}) => analyzeBody(target.value)}
+                disabled={!RequestMethodsSupportingCustomBody.includes(requestMethod)}
+                inputRef={requestBodyRef}
+                multiline
+                minRows={8}
+                maxRows={8}
+                InputLabelProps={{shrink: true}}
+                fullWidth
+                />
+            </FormControl>
+            <FormControl className={classes.formControl}>
+              <ValidatingTextField
+                validator={value => parseInt(value) <= maxRequestTimeout}
+                label={t('jobs.requestTimeout')}
+                defaultValue={Math.min(maxRequestTimeout, requestTimeout)}
+                onBlur={({target}) => setRequestTimeout(parseInt(target.value))}
+                onClick={({target}) => setRequestTimeout(parseInt(target.value))}
+                InputLabelProps={{shrink: true}}
+                InputProps={{
+                  startAdornment: <InputAdornment position='start'><TimerIcon /></InputAdornment>,
+                  endAdornment: <InputAdornment position='end'>{t('units.long.s')}</InputAdornment>
+                }}
+                inputProps={{min: 1, max: maxRequestTimeout, type: 'number'}}
+                patternErrorText={t('jobs.invalidTimeout', {maxRequestTimeout})}
+                inputRef={requestTimeoutRef}
+                />
+            </FormControl>
+            <FormControl className={classes.formControl}>
+              <FormControlLabel
+                control={<Switch
+                  checked={redirectSuccess}
+                  onChange={({target}) => setRedirectSuccess(target.checked)}
+                  />}
+                label={t('jobs.redirectSuccess')}
+                />
+            </FormControl>
+          </FormGroup>
+        </fieldset>
+      </Paper>
+    </div>
+
+    <Grid container direction='row' justifyContent='space-between' spacing={1}>
+      <Grid item>
+        <Button
+          startIcon={<CodeIcon />}
+          onClick={() => setShowCurlImport(true)}>
+          {t('jobs.curlImport.button')}
+        </Button>
+      </Grid>
+      <Grid item>
+        <Grid container direction='row' justifyContent='flex-end' spacing={1}>
+          <Grid item>
+            <Button
+              startIcon={<TestIcon />}
+              onClick={() => setShowTestRun(true)}>
+              {t('jobs.testRun.testRun')}
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button
+              variant='contained'
+              color='primary'
+              startIcon={saving ? <CircularProgress size='small' /> : <SaveIcon />}
+              onClick={() => saveJob()}
+              disabled={saving}>
+              {createMode ? t('common.create') : t('common.save')}
+            </Button>
+          </Grid>
+        </Grid>
+      </Grid>
+    </Grid>
+
+    {showTestRun && <JobTestRun onClose={() => setShowTestRun(false)} onUpdateUrl={updateUrl} jobId={jobId} job={updatedJob} />}
+
+    {showExportJob && <JobExport onClose={() => setShowExportJob(false)} job={updatedJob} />}
+
+    <CurlImportDialog
+      open={showCurlImport}
+      onClose={() => setShowCurlImport(false)}
+      onImport={applyImportedCommand}
+      />
+
+    {showStatusBadgeDialog && <JobStatusBadgeDialog onClose={() => setShowStatusBadgeDialog(false)} jobId={jobId} job={updatedJob} />}
+
+    {showDeleteJob && <Dialog open={true} onClose={() => setShowDeleteJob(false)}>
+      <DialogTitle>
+        {t('jobs.deleteJob', { jobTitle: job.title || job.url })}
+      </DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          {job.type === 1 ? t('jobs.cantDeleteMonitorJob') : t('jobs.confirmDeleteJob')}
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button autoFocus onClick={() => setShowDeleteJob(false)}>
+          {t('common.cancel')}
+        </Button>
+        {job.type !== 1 && <Button color='primary' onClick={() => deleteJob()}>
+          {t('common.delete')}
+        </Button>}
+      </DialogActions>
+    </Dialog>}
+  </>;
+}

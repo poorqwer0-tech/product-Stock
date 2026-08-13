@@ -1,0 +1,199 @@
+import React from 'react';
+import Breadcrumbs from '../misc/Breadcrumbs';
+import { TableContainer, Paper, LinearProgress, Typography, Button, useTheme, Box, Switch, Tooltip as MuiTooltip } from '@material-ui/core';
+import { useTranslation } from 'react-i18next';
+import { useJob } from '../../hooks/useJobs';
+import NotFound from '../misc/NotFound';
+import { useEffect } from 'react';
+import { getJobHistory } from '../../utils/API';
+import Table from '../misc/Table';
+import { useState } from 'react';
+import moment from 'moment';
+import SuccessIcon from '@material-ui/icons/Check';
+import ErrorIcon from '@material-ui/icons/ErrorOutline';
+import ScheduleIcon from '@material-ui/icons/Schedule';
+import EditIcon from '@material-ui/icons/Edit';
+import IconAvatar from '../misc/IconAvatar';
+import { JobStatus, jobStatusText, TimingFields, ChartColors, ChartColorsDark } from '../../utils/Constants';
+import HistoryDetailsButton from './HistoryDetailsButton';
+import Heading from '../misc/Heading';
+import { Link as RouterLink } from 'react-router-dom';
+import { ResponsiveContainer, AreaChart, XAxis, Area, YAxis, Tooltip } from 'recharts';
+import { formatMs } from '../../utils/Units';
+import useViewport from '../../hooks/useViewport';
+import useFolder from '../../hooks/useFolder';
+
+const REFRESH_INTERVAL = 60000;
+
+export default function History({ match }) {
+  const { folderBreadcrumb, urlPrefix } = useFolder(match);
+
+  const { t } = useTranslation();
+  const jobId = parseInt(match.params.jobId);
+  const { job, loading: pageLoading } = useJob(jobId);
+  const [ history, setHistory ] = useState([]);
+  const [ isLoading, setIsLoading ] = useState(true);
+  const [ chartData, setChartData ] = useState(null);
+  const [ useJobTimezone, setUseJobTimezone ] = useState(false);
+  const { isMobile } = useViewport();
+  const theme = useTheme();
+  const tick = { fill: theme.palette.text.primary };
+  const localTimezone = moment.tz.guess();
+
+  useEffect(() => {
+    const doRefresh = async () => {
+      getJobHistory(jobId)
+        .then(result => setHistory([
+          ...result.predictions.sort((a, b) => b - a).map(x => ({
+            datePlanned: x,
+            isPrediction: true,
+            identifier: 'pred-' + x
+          })),
+          ...result.history
+        ]))
+        .catch(() => null)
+        .finally(() => setIsLoading(false));
+    };
+
+    doRefresh();
+
+    const handle = window.setInterval(doRefresh, REFRESH_INTERVAL);
+    return () => window.clearInterval(handle);
+  }, [jobId]);
+
+  useEffect(() => {
+    if (!history.length || Math.max(...history.map(item => item.stats ? item.stats.total : 0)) === 0) {
+      setChartData(null);
+    } else {
+      setChartData(history.filter(item => !item.isPrediction).map(item => ({
+        ...TimingFields.reduce((prev, cur) => ({
+          fields: {
+            ...prev.fields,
+            [cur]: Math.round(Math.max(0, ((item.stats || {})[cur] - prev.lastValue)) / 10) / 100
+          },
+          lastValue: Math.max(prev.lastValue, (item.stats || {})[cur])
+        }), { fields: {}, lastValue: 0 }).fields,
+        date: item.date
+      })).sort((a, b) => a.date - b.date));
+    }
+  }, [history]);
+
+  function m(timestamp) {
+    if (useJobTimezone && job && job.schedule && job.schedule.timezone) {
+      return moment(timestamp).tz(job.schedule.timezone);
+    }
+    return moment(timestamp);
+  }
+
+  function formatTooltip(value, name) {
+    return [
+      formatMs(value, t),
+      t(`jobs.timingItem.${name}`)
+    ];
+  }
+
+  if (pageLoading) {
+    return <LinearProgress />;
+  }
+
+  if (!job) {
+    return <NotFound />;
+  }
+
+  const COLUMNS = [
+    {
+      head: t('jobs.executed'),
+      cell: log => <div style={{display: 'flex', alignItems: 'center'}}>
+          {log.isPrediction && <IconAvatar icon={ScheduleIcon} />}
+          {log.status === JobStatus.OK && <IconAvatar color='green' icon={SuccessIcon} />}
+          {log.status >= JobStatus.FAILED_DNS && <IconAvatar color='orange' icon={ErrorIcon} />}
+          {!log.isPrediction && <div>{m(log.date * 1000).calendar()}</div>}
+      </div>
+    },
+    {
+      head: t('jobs.scheduled'),
+      cell: log => m(log.datePlanned * 1000).calendar()
+    },
+    {
+      head: t('jobs.jitter'),
+      cell: log => !log.isPrediction && <>{formatMs(log.jitter, t)}</>
+    },
+    {
+      head: t('jobs.duration'),
+      cell: log => !log.isPrediction && <>{formatMs(log.duration, t)}</>
+    },
+    {
+      head: t('jobs.status'),
+      cell: log => log.isPrediction ? t('jobs.scheduled') : <>
+        <div>{t('jobs.statuses.' + jobStatusText(log.status))}</div>
+        {[JobStatus.OK, JobStatus.FAILED_HTTPERROR].includes(log.status) && <div><Typography variant="caption">
+            {log.httpStatus} {log.statusText}
+          </Typography></div>}
+      </>
+    },
+    {
+      head: t('common.actions'),
+      cell: log => !log.isPrediction && <HistoryDetailsButton log={log} moment={m} />
+    }
+  ];
+
+  return <>
+    <Breadcrumbs items={[
+        {
+          href: '/jobs',
+          text: t('common.cronjobs')
+        },
+        ...folderBreadcrumb,
+        {
+          href: urlPrefix + '/' + jobId,
+          text: job.title || job.url
+        },
+        {
+          href: urlPrefix + '/' + jobId + '/history',
+          text: t('jobs.history')
+        }
+      ]} />
+    <Heading actionButtons={<>
+        <Button
+          variant='contained'
+          size='small'
+          startIcon={<EditIcon />}
+          component={RouterLink}
+          to={`${urlPrefix}/${jobId}`}
+          >{t('jobs.editJob')}</Button>
+      </>} otherElements={<>
+        {job && job.schedule && job.schedule.timezone && job.schedule.timezone !== localTimezone &&
+          <Box display='flex' flexDirection='row' alignItems='center' mr={2}>
+            <MuiTooltip title={localTimezone} arrow><Typography noWrap>{t('jobs.localTimezone')}</Typography></MuiTooltip>
+            <Switch
+              checked={useJobTimezone}
+              onChange={({target}) => setUseJobTimezone(target.checked)} />
+            <MuiTooltip title={job.schedule.timezone} arrow><Typography noWrap>{t('jobs.jobTimezone')}</Typography></MuiTooltip>
+          </Box>}
+      </>}>
+      {t('jobs.jobHistoryHeading', { jobTitle: job.title || job.url })}
+    </Heading>
+    {chartData && chartData.length > 2 && <>
+        <ResponsiveContainer width='100%' height={200}>
+        <AreaChart data={chartData} margin={{right: 30, left: 10, bottom: 20, top: 10}}>
+          <XAxis dataKey='date' type='category' tick={tick} tickFormatter={value => m(value*1000).format('LT')} interval={isMobile ? 6 : 2} />
+          <YAxis type='number' tick={tick} tickFormatter={x => formatMs(x, t)} tickCount={3} />
+
+          <Tooltip contentStyle={{backgroundColor: theme.palette.background.paper}} formatter={formatTooltip} labelFormatter={value => m(value*1000).format('LLLL')} />
+
+          {TimingFields.map((item, index) =>
+            <Area type='monotone' dataKey={item} key={item} stackId='timing' stroke={theme.palette.type === 'dark' ? ChartColorsDark[index] : ChartColors[index]} fill={ChartColors[index]} />)}
+        </AreaChart>
+      </ResponsiveContainer>
+    </>}
+    <TableContainer component={Paper}>
+      <Table
+        columns={COLUMNS}
+        items={history}
+        empty={<em>{t('jobs.nohistory')}</em>}
+        loading={isLoading}
+        rowIdentifier='identifier'
+        />
+    </TableContainer>
+  </>;
+}

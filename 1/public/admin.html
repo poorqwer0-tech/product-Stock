@@ -1,0 +1,274 @@
+link href="/admin.html" class="admin-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        CONTROL PANEL
+      </a>
+    </div>
+  </header>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Control Panel | Sigma Lens Hub</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box glass">
+      <div class="login-header">
+        <div class="login-logo">◈</div>
+        <h2>ADMIN AUTHENTICATION</h2>
+        <p>Enter credentials to access Control Panel</p>
+      </div>
+      <form id="loginForm" class="login-form">
+        <div class="input-group">
+          <label>USERNAME</label>
+          <input type="text" id="loginUsername" value="admin" autocomplete="username">
+        </div>
+        <div class="input-group">
+          <label>PASSWORD</label>
+          <input type="password" id="loginPassword" value="admin123" autocomplete="current-password">
+        </div>
+        <button type="submit" class="login-btn">
+          <span class="btn-text">AUTHENTICATE</span>
+          <span class="btn-glow"></span>
+        </button>
+        <div id="loginError" class="login-error"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="adminApp" class="admin-app hidden">
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">◈</div>
+        <div>
+          <div class="brand-name">SIGMA<span>LENS</span></div>
+          <div class="brand-ver">ADMIN v2.0</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-section="dashboard">
+          <span class="nav-icon">▣</span> Dashboard
+        </a>
+        <a href="#" class="nav-item" data-section="links">
+          <span class="nav-icon">◈</span> Link Manager
+        </a>
+        <a href="#" class="nav-item" data-section="profile">
+          <span class="nav-icon">◉</span> Profile
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-name" id="sidebarUsername">admin</div>
+          <div class="user-role">ROOT ACCESS</div>
+        </div>
+        <button id="logoutBtn" class="logout-btn">DISCONNECT</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-header">
+        <h1 class="page-title" id="pageTitle">DASHBOARD</h1>
+        <div class="header-actions">
+          <div class="time-display" id="headerTime">00:00:00</div>
+          <div class="status-badge online">ONLINE</div>
+        </div>
+      </header>
+
+      <section id="dashboardSection" class="admin-section active">
+        <div class="stats-grid">
+          <div class="stat-card glass">
+            <div class="stat-header">
+              <span class="stat-icon">◈</span>
+              <span class="stat-trend up">+12%</span>
+            </div>
+            <div class="stat-value" id="dashTotalLinks">0</div>
+            <div class="stat-label">TOTAL LINKS</div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-header">
+              <span class="stat-icon">◉</span>
+              <span class="stat-trend stable">~</span>
+            </div>
+            <div class="stat-value" id="dashTotalUsers">0</div>
+            <div class="stat-label">SYSTEM USERS</div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-header">
+              <span class="stat-icon">◎</span>
+              <span class="stat-trend up">+5%</span>
+            </div>
+            <div class="stat-value" id="dashCpu">0%</div>
+            <div class="stat-label">CPU LOAD</div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-header">
+              <span class="stat-icon">◊</span>
+              <span class="stat-trend down">-2%</span>
+            </div>
+            <div class="stat-value" id="dashMemory">0 MB</div>
+            <div class="stat-label">MEMORY USED</div>
+          </div>
+        </div>
+
+        <div class="dashboard-row">
+          <div class="panel glass">
+            <div class="panel-header">
+              <h3>SYSTEM LOGS</h3>
+              <span class="panel-badge">LIVE</span>
+            </div>
+            <div class="panel-body">
+              <div class="log-feed" id="adminLogFeed">
+                <div class="log-entry info">[SYSTEM] Control Panel initialized</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel glass">
+            <div class="panel-header">
+              <h3>QUICK ACTIONS</h3>
+            </div>
+            <div class="panel-body">
+              <div class="quick-actions">
+                <button class="action-btn" onclick="showLinkModal()">
+                  <span class="action-icon">+</span>
+                  <span>Add New Link</span>
+                </button>
+                <button class="action-btn" onclick="switchSection('profile')">
+                  <span class="action-icon">✎</span>
+                  <span>Edit Profile</span>
+                </button>
+                <button class="action-btn" onclick="refreshStats()">
+                  <span class="action-icon">↻</span>
+                  <span>Refresh Data</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="linksSection" class="admin-section">
+        <div class="section-toolbar">
+          <div class="search-box">
+            <input type="text" id="linkSearch" placeholder="Search links...">
+          </div>
+          <button class="btn-primary" onclick="showLinkModal()">
+            <span>+</span> NEW LINK
+          </button>
+        </div>
+        <div class="table-container glass">
+          <table class="data-table" id="linksTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>TITLE</th>
+                <th>URL</th>
+                <th>CATEGORY</th>
+                <th>ORDER</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="linksTableBody">
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="profileSection" class="admin-section">
+        <div class="profile-editor glass">
+          <div class="editor-header">
+            <h3>PROFILE CONFIGURATION</h3>
+          </div>
+          <form id="profileForm" class="editor-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>DISPLAY NAME</label>
+                <input type="text" id="profName" required>
+              </div>
+              <div class="form-group">
+                <label>TITLE / ROLE</label>
+                <input type="text" id="profTitle" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>BIO / DESCRIPTION</label>
+              <textarea id="profBio" rows="3"></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>STATUS</label>
+                <select id="profStatus">
+                  <option value="online">ONLINE</option>
+                  <option value="away">AWAY</option>
+                  <option value="busy">BUSY</option>
+                  <option value="offline">OFFLINE</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>AVATAR IMAGE</label>
+                <input type="file" id="profAvatar" accept="image/*">
+                <div class="avatar-preview" id="avatarPreview"></div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">SAVE CHANGES</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="linkModal" class="modal">
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h3 id="modalTitle">NEW LINK</h3>
+        <button class="modal-close" onclick="hideLinkModal()">×</button>
+      </div>
+      <form id="linkForm" class="modal-form">
+        <input type="hidden" id="linkId">
+        <div class="form-group">
+          <label>TITLE</label>
+          <input type="text" id="linkTitle" required>
+        </div>
+        <div class="form-group">
+          <label>URL</label>
+          <input type="url" id="linkUrl" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>CATEGORY</label>
+            <input type="text" id="linkCategory" placeholder="e.g. social, dev">
+          </div>
+          <div class="form-group">
+            <label>ICON</label>
+            <input type="text" id="linkIcon" placeholder="e.g. github, twitter">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>ORDER INDEX</label>
+          <input type="number" id="linkOrder" value="0">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="hideLinkModal()">CANCEL</button>
+          <button type="submit" class="btn-primary">SAVE</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

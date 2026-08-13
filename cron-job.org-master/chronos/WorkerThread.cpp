@@ -1,0 +1,248 @@
+/*
+ * chronos, the cron-job.org execution daemon
+ * Copyright (C) 2017 Patrick Schlangen <patrick@schlangen.me>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ */
+
+#include "WorkerThread.h"
+
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <chrono>
+
+#include <unistd.h>
+
+#include "CurlWorker.h"
+#include "UpdateThread.h"
+#include "App.h"
+#include "Metrics.h"
+#include "MasterClientMetrics.h"
+
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TTransportUtils.h>
+
+#include "ChronosMaster.h"
+
+using namespace Chronos;
+
+WorkerThread::WorkerThread(int mday, int month, int year, int hour, int minute, std::size_t parallelJobs, std::size_t deferMs, JobType_t jobType)
+	: mday(mday), month(month), year(year), hour(hour), minute(minute), parallelJobs(parallelJobs), deferMs(deferMs), jobType(jobType)
+{
+	runningJobs.reserve(parallelJobs);
+}
+
+WorkerThread::~WorkerThread()
+{
+	if(!runningJobs.empty())
+	{
+		std::cerr << "WorkerThread::~WorkerThread(): runningJobs is not empty: " << runningJobs.size() << std::endl;
+		runningJobs.clear();
+	}
+}
+
+void WorkerThread::addJob(std::unique_ptr<HTTPRequest> req)
+{
+	requestQueue.push(std::move(req));
+}
+
+void WorkerThread::run()
+{
+	if(requestQueue.empty())
+		return;
+
+	keepAlive = shared_from_this();
+
+	Metrics::instance().adjustWorkerThreads(jobType, 1);
+
+	workerThread = std::thread(std::bind(&WorkerThread::threadMain, this));
+	workerThread.detach();
+}
+
+void WorkerThread::runJobs()
+{
+	if(inRunJobs)
+		return;
+
+	inRunJobs = true;
+
+	while(runningJobs.size() < parallelJobs && !requestQueue.empty())
+	{
+		auto job = std::move(requestQueue.front());
+		requestQueue.pop();
+
+		HTTPRequest *request = job.get();
+
+		runningJobs.emplace(request, std::move(job));
+
+		Metrics::instance().adjustWorkerInflight(request->result->jobType, 1);
+
+		request->onDone = std::bind(&WorkerThread::jobDone, this, request);
+		request->submit(curlWorker.get());
+	}
+
+	inRunJobs = false;
+}
+
+void WorkerThread::jobDone(HTTPRequest *req)
+{
+	jitterSum += req->result->jitter;
+	if(req->result->jitter > jitterMax)
+	{
+		jitterMax = req->result->jitter;
+	}
+	if(req->result->jitter < jitterMin)
+	{
+		jitterMin = req->result->jitter;
+	}
+
+	int timeTotalMs = req->result->timeTotal / 1000;
+	timeTotalSum += timeTotalMs;
+	if(timeTotalMs > timeTotalMax)
+	{
+		timeTotalMax = timeTotalMs;
+	}
+	if(timeTotalMs < timeTotalMin)
+	{
+		timeTotalMin = timeTotalMs;
+	}
+
+	if(req->result->status == JOBSTATUS_OK)
+	{
+		++succeededJobs;
+	}
+	else
+	{
+		++failedJobs;
+	}
+
+	metricsBatch.record(*req->result);
+	Metrics::instance().adjustWorkerInflight(req->result->jobType, -1);
+
+	// push result to result queue
+	UpdateThread::getInstance()->addResult(std::move(req->result));
+
+	// clean up
+	if (runningJobs.erase(req) == 0)
+	{
+		std::cerr << "WorkerThread::jobDone(): request not found in runningJobs: " << req << std::endl;
+	}
+
+	// start more jobs
+	runJobs();
+
+	// exit event loop when all requests have finished
+	if(runningJobs.empty() && curlWorker)
+	{
+		if(requestQueue.empty() || !inRunJobs)
+		{
+			curlWorker->stop();
+		}
+	}
+}
+
+void WorkerThread::addStat()
+{
+	std::shared_ptr<apache::thrift::transport::TTransport> masterSocket
+		= std::make_shared<apache::thrift::transport::TSocket>(
+			App::getInstance()->config->get("master_service_address"),
+			App::getInstance()->config->getInt("master_service_port"));
+	std::shared_ptr<apache::thrift::transport::TTransport> masterTransport
+		= std::make_shared<apache::thrift::transport::TBufferedTransport>(masterSocket);
+	std::shared_ptr<apache::thrift::protocol::TProtocol> masterProtocol
+		= std::make_shared<apache::thrift::protocol::TBinaryProtocol>(masterTransport);
+	std::shared_ptr<ChronosMasterClient> masterClient
+		= std::make_shared<ChronosMasterClient>(masterProtocol);
+
+	try
+	{
+		masterTransport->open();
+
+		const double jitterAvg = jitterSum / static_cast<double>(jobCount);
+		const double timeTotalAvg = timeTotalSum / static_cast<double>(jobCount);
+		const double failureRate = static_cast<double>(failedJobs) / static_cast<double>(jobCount);
+
+		NodeStatsEntry stats;
+		stats.d = mday;
+		stats.m = month;
+		stats.y = year;
+		stats.h = hour;
+		stats.i = minute;
+		stats.jobs = jobCount;
+		stats.jitter = jitterAvg;
+
+		callMaster("reportNodeStats", [&]() {
+			masterClient->reportNodeStats(App::getInstance()->config->getInt("node_id"), stats);
+		});
+
+		masterTransport->close();
+
+		std::cout << "WorkerThread::addStat(): mday = " << mday << ", month = " << month << ", hour = " << hour << ", minute = " << minute << ": "
+			<< "jobCount = " << jobCount << ", succeededJobs = " << succeededJobs << ", failedJobs = " << failedJobs << " (" << (failureRate * 100.0) << " %), "
+			<< "jitterMin = " << jitterMin << ", jitterMax = " << jitterMax << ", jitterAvg = " << jitterAvg << ", "
+			<< "timeTotalMin = " << timeTotalMin << ", timeTotalMax = " << timeTotalMax << ", timeTotalAvg = " << timeTotalAvg << ", "
+			<< std::endl;
+	}
+	catch(const apache::thrift::TException &ex)
+	{
+		std::cerr << "WorkerThread::addStat(): Failed to report node stats: " << ex.what() << std::endl;
+	}
+}
+
+void WorkerThread::threadMain()
+{
+	const auto threadStart = std::chrono::steady_clock::now();
+
+	try
+	{
+		std::cout << "WorkerThread::threadMain(): Entered" << std::endl;
+
+		if(deferMs > 0)
+		{
+			std::cout << "WorkerThread::threadMain(): Deferring thread by " << deferMs << " ms..." << std::endl;
+			usleep(deferMs * 1000);
+		}
+
+		jobCount = requestQueue.size();
+
+		curlWorker = std::make_unique<CurlWorker>();
+
+		curlWorker->onDone([] (CURL *easy, CURLcode res) {
+			HTTPRequest *req = nullptr;
+			if(curl_easy_getinfo(easy, CURLINFO_PRIVATE, &req) != CURLE_OK || req == nullptr)
+				throw std::runtime_error("Failed to retrieve associated HTTPRequest!");
+			req->done(res);
+		});
+
+		// add jobs
+		runJobs();
+
+		// main loop
+		curlWorker->run();
+
+		// clean up
+		curlWorker.reset();
+
+		Metrics::instance().mergeWorkerBatch(metricsBatch);
+
+		addStat();
+
+		std::cout << "WorkerThread::threadMain(): Finished" << std::endl;
+	}
+	catch(const std::runtime_error &ex)
+	{
+		std::cout << "WorkerThread::threadEntry(): Exception: " << ex.what() << std::endl;
+	}
+
+	const std::chrono::duration<double> lifetime = std::chrono::steady_clock::now() - threadStart;
+	Metrics::instance().observeWorkerThreadLifetimeSeconds(jobType, lifetime.count());
+	Metrics::instance().adjustWorkerThreads(jobType, -1);
+	keepAlive.reset();
+}

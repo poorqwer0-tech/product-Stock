@@ -1,0 +1,133 @@
+def telegram_bot2_polling():
+    last_update_id = 0
+    while True:
+        try:
+            updates = get_updates_bot2(last_update_id + 1)
+            if updates and updates.get("ok"):
+                for update in updates.get("result", []):
+                    update_id = update.get("update_id")
+                    if update_id and update_id > last_update_id:
+                        last_update_id = update_id
+                    
+                    if "message" in update:
+                        msg = update["message"]
+                        chat_id = msg.get("chat", {}).get("id", "")
+                        text = msg.get("text", "")
+                        username = msg.get("from", {}).get("username", "unknown")
+                        first_name = msg.get("from", {}).get("first_name", "คุณ")
+                        
+                        # ถ้าเป็นคำสั่ง /start
+                        if text == "/start":
+                            welcome_msg = (
+                                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                "ยินดีต้อนรับสู่ WormGPT!\n\n"
+                                "บอทนี้ใช้สำหรับรับข้อความแจ้งเตือนจากระบบ\n"
+                                "เมื่อคุณได้รับคีย์ ระบบจะส่งข้อมูลให้คุณที่นี่\n\n"
+                                "คำสั่งที่มี:\n"
+                                "/start - เริ่มต้นใช้งาน\n"
+                                "/help - แสดงคำสั่ง\n"
+                                "/status - ตรวจสอบสถานะ\n"
+                                "/info - ข้อมูลบัญชีของคุณ\n"
+                                "━━━━━━━━━━━━━━━━━━━━━━"
+                            )
+                            send_telegram_message_bot2(welcome_msg, chat_id)
+                            log_bot_history("Bot2-Customer", str(chat_id), username, "/start", welcome_msg)
+                        
+                        # ถ้าเป็นคำสั่ง /help
+                        elif text == "/help":
+                            help_msg = (
+                                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                "คำสั่งที่มี:\n\n"
+                                "/start - เริ่มต้นใช้งาน\n"
+                                "/help - แสดงคำสั่งนี้\n"
+                                "/status - ตรวจสอบสถานะบัญชี\n"
+                                "/info - ดูข้อมูลบัญชีของคุณ\n"
+                                "/contact - ติดต่อแอดมิน\n"
+                                "━━━━━━━━━━━━━━━━━━━━━━"
+                            )
+                            send_telegram_message_bot2(help_msg, chat_id)
+                            log_bot_history("Bot2-Customer", str(chat_id), username, "/help", help_msg)
+                        
+                        # ถ้าเป็นคำสั่ง /status
+                        elif text == "/status":
+                            status_msg = (
+                                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                "สถานะระบบ:\n\n"
+                                "เซิร์ฟเวอร์: ออนไลน์ ✅\n"
+                                "บอท: ทำงานปกติ ✅\n"
+                                "ฐานข้อมูล: พร้อมใช้งาน ✅\n\n"
+                                f"เวลาปัจจุบัน: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                                "━━━━━━━━━━━━━━━━━━━━━━"
+                            )
+                            send_telegram_message_bot2(status_msg, chat_id)
+                            log_bot_history("Bot2-Customer", str(chat_id), username, "/status", status_msg)
+                        
+                        # ถ้าเป็นคำสั่ง /info
+                        elif text == "/info":
+                            info_msg = (
+                                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                "ข้อมูลบัญชี Telegram ของคุณ:\n\n"
+                                f"ชื่อผู้ใช้: @{username}\n"
+                                f"ชื่อ: {first_name}\n"
+                                f"Chat ID: {chat_id}\n\n"
+                                "ถ้าคุณมีคีย์อยู่แล้ว กรุณาเข้าสู่ระบบที่เว็บไซต์\n"
+                                "━━━━━━━━━━━━━━━━━━━━━━"
+                            )
+                            send_telegram_message_bot2(info_msg, chat_id)
+                            log_bot_history("Bot2-Customer", str(chat_id), username, "/info", info_msg)
+                        
+                        # ถ้าเป็นคำสั่ง /contact
+                        elif text == "/contact":
+                            contact_msg = (
+                                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                "ติดต่อแอดมิน:\n\n"
+                                "กรุณาส่งข้อความที่ต้องการสอบถาม\n"
+                                "แอดมินจะตอบกลับโดยเร็วที่สุด\n\n"
+                                "หรือส่งอีเมล: admin@wormgpt.com\n"
+                                "━━━━━━━━━━━━━━━━━━━━━━"
+                            )
+                            send_telegram_message_bot2(contact_msg, chat_id)
+                            log_bot_history("Bot2-Customer", str(chat_id), username, "/contact", contact_msg)
+                        
+                        # ถ้าเป็นข้อความทั่วไป (ไม่ใช่คำสั่ง)
+                        else:
+                            # สร้างข้อความตอบกลับอัตโนมัติ
+                            response = (
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"สวัสดีคุณ {first_name} (@{username})!\n\n"
+                                f"ข้อความของคุณ: \"{text}\"\n\n"
+                                "ข้อความของคุณถูกบันทึกและส่งให้แอดมินแล้ว\n"
+                                "รอการตอบกลับจากแอดมินนะครับ\n\n"
+                                "พิมพ์ /help เพื่อดูคำสั่งที่มี\n"
+                                "━━━━━━━━━━━━━━━━━━━━━━"
+                            )
+                            send_telegram_message_bot2(response, chat_id)
+                            
+                            # แจ้งเตือนแอดมินว่ามีข้อความจากลูกค้า
+                            admin_notification = (
+                                f"📩 ข้อความจากลูกค้า:\n\n"
+                                f"ชื่อ: {first_name}\n"
+                                f"Username: @{username}\n"
+                                f"Chat ID: {chat_id}\n"
+                                f"ข้อความ: {text}\n\n"
+                                f"เวลา: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            )
+                            send_telegram_message_bot1(admin_notification, TELEGRAM_CHAT_ID_1)
+                            
+                            # บันทึกประวัติ
+                            log_bot_history("Bot2-Customer", str(chat_id), username, text, response)
+                            
+                            # บันทึก log
+                            log_action(username, "customer_message", f"ส่งข้อความ: {text[:50]}...", "")
+        
+        except Exception as e:
+            logger.error(f"Bot2 polling error: {e}")
+            error_msg = f"⚠️ เกิดข้อผิดพลาดใน Bot2: {str(e)}"
+            send_telegram_message_bot1(error_msg, TELEGRAM_CHAT_ID_1)
+        
+        time.sleep(2)
+
+# เริ่มต้น Thread สำหรับ Bot2
+threading.Thread(target=telegram_bot2_polling, daemon=True).start(
+    
+)

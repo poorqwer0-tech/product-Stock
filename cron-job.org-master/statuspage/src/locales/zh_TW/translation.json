@@ -1,0 +1,48 @@
+{
+  "common": {
+    "poweredBy": "技術提供者",
+    "refresh": "重新整理"
+  },
+  "timespan": {
+    "1year": "1 年",
+    "6months": "6 個月",
+    "1month": "1 個月",
+    "1week": "1 週",
+    "1day": "1 天"
+  },
+  "incidents": {
+    "active": "進行中的事件",
+    "past": "歷史事件",
+    "startedToday": "今天 {{time}} 開始",
+    "startedYesterday": "昨天 {{time}} 開始",
+    "startedWeekday": "{{weekday}} {{time}} 開始",
+    "startedOn": "{{date}} 開始",
+    "endedToday": "今天 {{time}} 結束",
+    "endedYesterday": "昨天 {{time}} 結束",
+    "endedWeekday": "{{weekday}} {{time}} 結束",
+    "endedOn": "{{date}} 結束"
+  },
+  "status": {
+    "availability": "可用性",
+    "availabilityWarning": "可用性警告",
+    "availabilityError": "可用性錯誤",
+    "lowAvailabilityText": "我們在過去 30 分鐘內遇到了百分之 {{percent}} 的可用性降低。",
+    "latency": "延遲",
+    "latencyWarning": "延遲警告",
+    "latencyError": "延遲錯誤",
+    "highLatencyText": "我們在過去 30 分鐘內遇到高達 {{ms}} 毫秒的異常延遲。",
+    "healthy": "健康",
+    "allSystemsRunAsExpected": "所有系統均運作正常。",
+    "disabled": "已停用"
+  },
+  "error": {
+    "404": {
+      "title": "找不到頁面",
+      "text": "找不到請求的狀態頁面。請確認您的連結是正確的，然後重試。"
+    },
+    "other": {
+      "title": "讀取狀態頁面時發生錯誤",
+      "text": "很抱歉，我們暫時無法讀取狀態頁面，請稍後再試。"
+    }
+  }
+}
